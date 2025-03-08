@@ -63,7 +63,8 @@
                 left: 0;
             }
             #verses-container, #split-container {
-                margin-left: 250px;
+                margin-left: 250px; /* Ensure content moves right */
+                width: calc(100% - 250px); /* Adjust width to fit */
             }
         }
         #verses-container {
@@ -337,22 +338,21 @@
             const thread = threadsData[threadType];
             const labelY = yOffset - 30;
             thread.labelY = labelY;
-            thread.nodePositions = {}; // Store positions per thread
+            thread.nodePositions = {};
             thread.nodes.forEach((node, nodeIndex) => {
                 const pos = {
                     x: 100 + nodeIndex * xSpacing,
                     y: yOffset
                 };
                 thread.nodePositions[node.id] = pos;
-                nodePositions[`${node.id}-${threadType}`] = pos; // Unique key for global lookup
+                nodePositions[`${node.id}-${threadType}`] = pos;
             });
-            yOffset += 100; // Increment Y for next thread
+            yOffset += 100;
         });
 
         // Populate tapestry container
         Object.keys(threadsData).forEach(threadType => {
             const thread = threadsData[threadType];
-            // Thread Label
             const label = document.createElement('div');
             label.className = `thread-label ${threadType}`;
             label.id = `label-${threadType}`;
@@ -361,18 +361,16 @@
             label.style.left = '100px';
             tapestryContainer.appendChild(label);
 
-            // Nodes and Threads
             thread.nodes.forEach((node, index) => {
                 const nodeEl = document.createElement('div');
                 nodeEl.className = `node ${threadType}`;
-                nodeEl.id = `${node.id}-${threadType}`; // Unique ID per thread
+                nodeEl.id = `${node.id}-${threadType}`;
                 nodeEl.style.top = `${thread.nodePositions[node.id].y}px`;
                 nodeEl.style.left = `${thread.nodePositions[node.id].x}px`;
                 nodeEl.innerHTML = `<span>${node.label}</span>`;
-                nodeEl.dataset.nodeId = node.id; // Store original node ID
+                nodeEl.dataset.nodeId = node.id;
                 tapestryContainer.appendChild(nodeEl);
 
-                // Prompt
                 const prompt = document.createElement('div');
                 prompt.className = `prompt ${threadType}`;
                 prompt.id = `prompt-${node.id}-${threadType}`;
@@ -381,7 +379,6 @@
                 prompt.style.left = `${thread.nodePositions[node.id].x}px`;
                 tapestryContainer.appendChild(prompt);
 
-                // Thread (edge) if not last node
                 if (index < thread.nodes.length - 1) {
                     const threadEl = document.createElement('div');
                     threadEl.className = `thread ${threadType}`;
@@ -420,12 +417,14 @@
 
         // Fetch chapter from ESV API
         async function fetchChapter(book, chapter) {
+            console.log(`Fetching chapter: ${book} ${chapter}`);
             const passage = `${book} ${chapter}`;
             try {
                 const response = await fetch(`${apiBase}?q=${encodeURIComponent(passage)}&include-verse-numbers=true`, {
                     headers: { 'Authorization': `Token ${apiKey}` }
                 });
                 const data = await response.json();
+                console.log(`Fetched ${passage}:`, data.passages[0] ? 'Success' : 'Empty');
                 return data.passages[0] || 'Error loading chapter.';
             } catch (error) {
                 console.error('API Error:', error);
@@ -438,12 +437,14 @@
             const text = await fetchChapter('Genesis', 1);
             versesContainer.innerHTML = text;
             addVerseClickListeners(versesContainer);
+            console.log('Initial chapter loaded');
         }
         loadInitialChapter();
 
         // Hamburger menu toggle
         hamburger.addEventListener('click', () => {
             menu.classList.toggle('active');
+            console.log('Hamburger clicked, menu active:', menu.classList.contains('active'));
         });
 
         // Chapter selection
@@ -458,6 +459,7 @@
                 splitContainer.style.display = 'none';
                 addVerseClickListeners(versesContainer);
                 if (window.innerWidth <= 768) menu.classList.remove('active');
+                console.log(`Chapter selected: ${currentChapter}`);
             }
         });
 
@@ -472,14 +474,15 @@
 
             threadElement.style.width = '0px';
             threadElement.style.height = '1px';
-            threadElement.style.left = `${start.x + nodeWidth / 2}px`; // Center of start node
-            threadElement.style.top = `${start.y + nodeWidth / 2}px`; // Center of start node
+            threadElement.style.left = `${start.x + nodeWidth / 2}px`;
+            threadElement.style.top = `${start.y + nodeWidth / 2}px`;
             threadElement.style.transform = `rotate(0deg)`;
 
             threadElement.classList.add('active');
             setTimeout(() => {
                 threadElement.style.width = `${length}px`;
             }, 100);
+            console.log(`Drawing thread ${threadElement.id} from ${start.x},${start.y} to ${end.x},${end.y}`);
         }
 
         // Pan to node
@@ -490,6 +493,7 @@
             const scrollY = nodeRect.top - bottomRect.top + bottomHalf.scrollTop - (bottomHalf.offsetHeight / 2) + 30;
 
             bottomHalf.scrollTo({ left: scrollX, top: scrollY, behavior: 'smooth' });
+            console.log(`Panning to node ${node.id} at x:${scrollX}, y:${scrollY}`);
         }
 
         // Show chapter with highlighted verse
@@ -512,6 +516,7 @@
             });
             backButton.style.display = 'block';
             addVerseClickListeners(verseContent);
+            console.log(`Showing verse context for ${nodeId}: ${passage}`);
         }
 
         // Restore previous chapter
@@ -522,6 +527,7 @@
                 verseContent.innerHTML = text;
                 backButton.style.display = 'none';
                 addVerseClickListeners(verseContent);
+                console.log(`Restored chapter: ${currentChapter}`);
             }
         }
 
@@ -542,15 +548,22 @@
 
             threadTypes.forEach(threadType => {
                 const label = document.getElementById(`label-${threadType}`);
-                if (label) label.classList.add('active');
+                if (label) {
+                    label.classList.add('active');
+                    console.log(`Showing label for ${threadType}`);
+                }
 
                 const threadNodes = threadsData[threadType].nodes;
                 threadNodes.forEach(node => {
                     const el = document.getElementById(`${node.id}-${threadType}`);
                     if (activeNodes.has(`${node.id}-${threadType}`)) {
                         el.classList.add('active');
+                        console.log(`Activating node ${node.id}-${threadType}`);
                         const prompt = document.getElementById(`prompt-${node.id}-${threadType}`);
-                        if (prompt && node.id === nodeId && threadType === threadTypeClicked) prompt.classList.add('active');
+                        if (prompt && node.id === nodeId && threadType === threadTypeClicked) {
+                            prompt.classList.add('active');
+                            console.log(`Showing prompt for ${node.id}-${threadType}`);
+                        }
                     }
                 });
 
@@ -559,6 +572,7 @@
                     const endNode = thread.dataset.endNode;
                     if (activeNodes.has(`${startNode}-${threadType}`) && activeNodes.has(`${endNode}-${threadType}`)) {
                         thread.classList.add('active');
+                        console.log(`Activating thread ${thread.id}`);
                     }
                 });
             });
@@ -576,6 +590,7 @@
             if (!activeNodes.has(uniqueNodeId)) {
                 activeNodes.add(uniqueNodeId);
                 node.classList.add('active');
+                console.log(`Opened bottom for ${uniqueNodeId}`);
             }
 
             showThreads(nodeId, threadType);
@@ -602,40 +617,57 @@
             activeNodes.clear();
             document.querySelectorAll('.node').forEach(node => node.classList.remove('active'));
             document.querySelectorAll('.thread').forEach(thread => thread.classList.remove('active'));
+            console.log('Bottom closed, active nodes cleared');
         }
 
         // Add verse click listeners
         function addVerseClickListeners(container) {
             const verses = container.querySelectorAll('.p');
-            verses.forEach(verse => {
+            console.log(`Adding listeners to ${verses.length} verses`);
+            verses.forEach((verse, index) => {
                 verse.addEventListener('click', () => {
+                    console.log(`Verse ${index + 1} clicked: ${verse.textContent.substring(0, 30)}...`);
                     const matchingNodes = Object.values(threadsData).flatMap(t => t.nodes.map(n => ({ ...n, threadType: t }))).filter(n => {
                         const passage = n.passage;
-                        return verse.textContent.includes(passage.split(':')[1]);
+                        const verseNum = passage.split(':')[1];
+                        const matches = verse.textContent.includes(verseNum);
+                        console.log(`Checking ${passage} (verse ${verseNum}) against verse text: ${matches}`);
+                        return matches;
                     });
+                    console.log(`Found ${matchingNodes.length} matching nodes for verse`);
                     if (matchingNodes.length > 0) {
                         matchingNodes.forEach(node => {
                             const threadType = node.threadType.label.toLowerCase();
                             const uniqueNodeId = `${node.id}-${threadType}`;
+                            console.log(`Processing node ${uniqueNodeId} for thread ${threadType}`);
                             if (!activeNodes.has(uniqueNodeId)) {
                                 activeNodes.add(uniqueNodeId);
                                 const nodeEl = document.getElementById(uniqueNodeId);
                                 if (nodeEl) {
                                     nodeEl.classList.add('active');
-                                    console.log(`Activating ${uniqueNodeId} at x:${nodeEl.style.left}, y:${nodeEl.style.top}`);
+                                    console.log(`Activated ${uniqueNodeId} at x:${nodeEl.style.left}, y:${nodeEl.style.top}`);
                                 } else {
-                                    console.error(`Node ${uniqueNodeId} not found`);
+                                    console.error(`Node ${uniqueNodeId} not found in DOM`);
                                 }
+                            } else {
+                                console.log(`${uniqueNodeId} already active`);
                             }
                             showThreads(node.id, threadType);
                             const nodeEl = document.getElementById(uniqueNodeId);
-                            if (nodeEl) panToNode(nodeEl);
+                            if (nodeEl) {
+                                panToNode(nodeEl);
+                            } else {
+                                console.error(`Cannot pan to ${uniqueNodeId} - element missing`);
+                            }
                         });
                         showVerseContext(matchingNodes[0].id);
                         versesContainer.classList.add('hidden');
                         splitContainer.style.display = 'flex';
                         bottomHalf.classList.remove('hidden');
                         topHalf.style.flex = '1';
+                        console.log('Split view opened');
+                    } else {
+                        console.log('No matching nodes found for this verse');
                     }
                 });
             });
@@ -643,6 +675,7 @@
 
         // Initial split screen
         versesContainer.addEventListener('click', () => {
+            console.log('Initial verses container clicked');
             openBottom('gen1', 'creation');
         });
 
@@ -655,14 +688,19 @@
                 const threadNodes = threadsData[threadType].nodes;
                 const nodeIndex = threadNodes.findIndex(n => n.id === nodeId);
 
+                console.log(`Node ${uniqueNodeId} clicked`);
                 if (!activeNodes.has(uniqueNodeId)) {
                     activeNodes.add(uniqueNodeId);
                     node.classList.add('active');
+                    console.log(`Activated ${uniqueNodeId}`);
                 }
 
                 document.querySelectorAll('.prompt').forEach(p => p.classList.remove('active'));
                 const prompt = document.getElementById(`prompt-${nodeId}-${threadType}`);
-                if (prompt) prompt.classList.add('active');
+                if (prompt) {
+                    prompt.classList.add('active');
+                    console.log(`Showing prompt for ${uniqueNodeId}`);
+                }
 
                 panToNode(node);
                 showVerseContext(nodeId);
@@ -673,6 +711,7 @@
                     document.getElementById(nextNodeId).classList.add('active');
                     const threadEl = document.getElementById(`thread-${threadType}-${nodeIndex}`);
                     if (threadEl) drawThread(threadEl);
+                    console.log(`Progressed to ${nextNodeId}`);
                 }
 
                 showThreads(nodeId, threadType);
