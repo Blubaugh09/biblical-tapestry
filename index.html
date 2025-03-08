@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Biblical Tapestry</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a2e;
+            color: #007bff;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Hamburger Menu Styles */
+        #hamburger {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            font-size: 30px;
+            background: none;
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            z-index: 10;
+        }
+        #menu {
+            position: fixed;
+            top: 0;
+            left: -250px;
+            width: 250px;
+            height: 100%;
+            background: #333;
+            color: #fff;
+            transition: left 0.3s ease;
+            z-index: 9;
+            padding: 60px 20px 20px;
+            overflow-y: auto;
+        }
+        #menu.active {
+            left: 0;
+        }
+        #menu select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #444;
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+        }
+        #verses-container {
+            flex: 1;
+            padding: 20px;
+            color: #fff;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            cursor: pointer;
+        }
+        #verses-container.hidden {
+            display: none;
+        }
+        #split-container {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            height: 100vh;
+        }
+        #top-half {
+            flex: 1;
+            padding: 20px;
+            color: #fff;
+            overflow-y: auto;
+            border-bottom: 1px solid #007bff;
+            position: relative;
+        }
+        #bottom-half {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+            transition: flex 0.3s ease;
+        }
+        #bottom-half.hidden {
+            flex: 0;
+            height: 0;
+        }
+        #tapestry-container {
+            position: absolute;
+            width: 2000px;
+            height: 300px;
+        }
+        .verse {
+            margin: 10px 0;
+            transition: color 0.3s ease;
+            cursor: pointer;
+        }
+        .verse:hover {
+            color: #007bff;
+        }
+        .node {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            z-index: 2;
+            display: none;
+        }
+        .node.active {
+            display: flex;
+        }
+        .node:hover {
+            transform: scale(1.2);
+        }
+        .node.creation {
+            background: #007bff;
+        }
+        .node.creation:hover {
+            box-shadow: 0 0 15px rgba(0, 123, 255, 0.8);
+        }
+        .node.spirit {
+            background: #28a745;
+        }
+        .node.spirit:hover {
+            box-shadow: 0 0 15px rgba(40, 167, 69, 0.8);
+        }
+        .node span {
+            font-size: 14px;
+            color: #fff;
+            font-weight: bold;
+            text-align: center;
+        }
+        .thread {
+            position: absolute;
+            background: none;
+            transform-origin: 0 0;
+            transition: width 0.5s ease;
+            z-index: 1;
+            display: none;
+        }
+        .thread.active {
+            display: block;
+        }
+        .thread.creation {
+            border: 1px dashed #007bff;
+        }
+        .thread.spirit {
+            border: 1px dashed #28a745;
+        }
+        .prompt {
+            position: absolute;
+            color: #fff;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: 3;
+            display: none;
+        }
+        .prompt.active {
+            display: block;
+            opacity: 1;
+        }
+        .thread-label {
+            position: absolute;
+            padding: 5px 10px;
+            border-radius: 3px;
+            color: #fff;
+            font-weight: bold;
+            z-index: 5;
+            display: none;
+        }
+        .thread-label.active {
+            display: block;
+        }
+        .thread-label.creation {
+            background: #007bff;
+        }
+        .thread-label.spirit {
+            background: #28a745;
+        }
+        #back-button, #close-button {
+            position: absolute;
+            background: #007bff;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        #back-button {
+            top: 10px;
+            right: 10px;
+            display: none;
+        }
+        #close-button {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            z-index: 5;
+        }
+        #back-button:hover, #close-button:hover {
+            background: #0056b3;
+        }
+        .highlight {
+            color: #007bff;
+            font-weight: bold;
+            background: rgba(0, 123, 255, 0.2);
+            padding: 2px 5px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Hamburger Menu -->
+    <button id="hamburger">☰</button>
+    <div id="menu">
+        <select id="book-select">
+            <option value="">Select a Book</option>
+            <!-- Populated dynamically -->
+        </select>
+        <select id="chapter-select">
+            <option value="">Select a Chapter</option>
+            <!-- Populated dynamically -->
+        </select>
+    </div>
+
+    <!-- Initial Verses Display -->
+    <div id="verses-container">
+        <div class="verse" data-node="gen1">Loading...</div>
+    </div>
+
+    <!-- Split Screen -->
+    <div id="split-container">
+        <div id="top-half">
+            <div id="verse-content"></div>
+            <button id="back-button">Back</button>
+        </div>
+        <div id="bottom-half">
+            <div id="tapestry-container">
+                <!-- Thread 1: Creation (Blue) -->
+                <div class="thread-label creation" id="label-creation" style="top: 40px; left: 100px;">Creation</div>
+                <div class="node creation" id="gen1" style="top: 70px; left: 100px;"><span>Gen 1:1</span></div>
+                <div class="node creation" id="gen2-creation" style="top: 70px; left: 300px;"><span>Gen 1:2</span></div>
+                <div class="node creation" id="john1" style="top: 70px; left: 500px;"><span>John 1:1</span></div>
+                <div class="node creation" id="col1" style="top: 70px; left: 700px;"><span>Col 1:16</span></div>
+                <div class="node creation" id="rev21" style="top: 70px; left: 900px;"><span>Rev 21:1</span></div>
+                <div class="node creation" id="rev22" style="top: 70px; left: 1100px;"><span>Rev 22:13</span></div>
+                <!-- Thread 2: Spirit (Green) -->
+                <div class="thread-label spirit" id="label-spirit" style="top: 140px; left: 100px;">Spirit</div>
+                <div class="node spirit" id="gen2" style="top: 170px; left: 100px;"><span>Gen 1:2</span></div>
+                <div class="node spirit" id="job26" style="top: 170px; left: 300px;"><span>Job 26:13</span></div>
+                <div class="node spirit" id="ps104" style="top: 170px; left: 500px;"><span>Ps 104:30</span></div>
+                <div class="node spirit" id="ez37" style="top: 170px; left: 700px;"><span>Ezek 37:9</span></div>
+                <div class="node spirit" id="jn3" style="top: 170px; left: 900px;"><span>John 3:5</span></div>
+                <div class="node spirit" id="acts2" style="top: 170px; left: 1100px;"><span>Acts 2:2</span></div>
+                <!-- Threads -->
+                <div class="thread creation" id="thread1-1"></div>
+                <div class="thread creation" id="thread1-2"></div>
+                <div class="thread creation" id="thread1-3"></div>
+                <div class="thread creation" id="thread1-4"></div>
+                <div class="thread creation" id="thread1-5"></div>
+                <div class="thread spirit" id="thread2-1"></div>
+                <div class="thread spirit" id="thread2-2"></div>
+                <div class="thread spirit" id="thread2-3"></div>
+                <div class="thread spirit" id="thread2-4"></div>
+                <div class="thread spirit" id="thread2-5"></div>
+                <!-- Prompts -->
+                <div class="prompt creation" id="prompt-gen1" style="top: 140px; left: 100px;">How does this begin God’s order?</div>
+                <div class="prompt creation" id="prompt-gen2-creation" style="top: 140px; left: 300px;">What was the state of creation?</div>
+                <div class="prompt creation" id="prompt-john1" style="top: 140px; left: 500px;">How is Christ the Word revealed?</div>
+                <div class="prompt creation" id="prompt-col1" style="top: 140px; left: 700px;">What does this say about Christ’s role?</div>
+                <div class="prompt creation" id="prompt-rev21" style="top: 140px; left: 900px;">How does creation renew?</div>
+                <div class="prompt creation" id="prompt-rev22" style="top: 140px; left: 1100px;">Who holds the end and beginning?</div>
+                <div class="prompt spirit" id="prompt-gen2" style="top: 240px; left: 100px;">What moved over the waters?</div>
+                <div class="prompt spirit" id="prompt-job26" style="top: 240px; left: 300px;">How does the Spirit form?</div>
+                <div class="prompt spirit" id="prompt-ps104" style="top: 240px; left: 500px;">What renews the earth?</div>
+                <div class="prompt spirit" id="prompt-ez37" style="top: 240px; left: 700px;">How does breath revive?</div>
+                <div class="prompt spirit" id="prompt-jn3" style="top: 240px; left: 900px;">What births anew?</div>
+                <div class="prompt spirit" id="prompt-acts2" style="top: 240px; left: 1100px;">How does the Spirit descend?</div>
+            </div>
+            <button id="close-button">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const versesContainer = document.getElementById('verses-container');
+        const splitContainer = document.getElementById('split-container');
+        const bottomHalf = document.getElementById('bottom-half');
+        const topHalf = document.getElementById('top-half');
+        const verseContent = document.getElementById('verse-content');
+        const backButton = document.getElementById('back-button');
+        const closeButton = document.getElementById('close-button');
+        const hamburger = document.getElementById('hamburger');
+        const menu = document.getElementById('menu');
+        const bookSelect = document.getElementById('book-select');
+        const chapterSelect = document.getElementById('chapter-select');
+        const nodes = document.querySelectorAll('.node');
+        const threads = document.querySelectorAll('.thread');
+        const prompts = document.querySelectorAll('.prompt');
+        const threadLabels = document.querySelectorAll('.thread-label');
+
+        // ESV API Key (replace with your own)
+        const apiKey = 'c3be9ae20e39bd6637c709cd2e94fd42135764d1';
+        const apiBase = 'https://api.esv.org/v3/passage/html/';
+
+        // Book and chapter data (simplified for demo)
+        const books = [
+            { name: 'Genesis', chapters: 50, abbr: 'Gen' },
+            { name: 'John', chapters: 21, abbr: 'John' },
+            { name: 'Colossians', chapters: 4, abbr: 'Col' },
+            { name: 'Revelation', chapters: 22, abbr: 'Rev' },
+            { name: 'Job', chapters: 42, abbr: 'Job' },
+            { name: 'Psalms', chapters: 150, abbr: 'Ps' },
+            { name: 'Ezekiel', chapters: 48, abbr: 'Ezek' },
+            { name: 'Acts', chapters: 28, abbr: 'Acts' }
+        ];
+
+        // Node to passage mapping
+        const nodePassages = {
+            'gen1': 'Genesis 1:1',
+            'gen2-creation': 'Genesis 1:2',
+            'john1': 'John 1:1',
+            'col1': 'Colossians 1:16',
+            'rev21': 'Revelation 21:1',
+            'rev22': 'Revelation 22:13',
+            'gen2': 'Genesis 1:2',
+            'job26': 'Job 26:13',
+            'ps104': 'Psalm 104:30',
+            'ez37': 'Ezekiel 37:9',
+            'jn3': 'John 3:5',
+            'acts2': 'Acts 2:2'
+        };
+
+        // Positions
+        const positions = {
+            gen1: { x: 130, y: 100 },
+            'gen2-creation': { x: 330, y: 100 },
+            john1: { x: 530, y: 100 },
+            col1: { x: 730, y: 100 },
+            rev21: { x: 930, y: 100 },
+            rev22: { x: 1130, y: 100 },
+            gen2: { x: 130, y: 200 },
+            job26: { x: 330, y: 200 },
+            ps104: { x: 530, y: 200 },
+            ez37: { x: 730, y: 200 },
+            jn3: { x: 930, y: 200 },
+            acts2: { x: 1130, y: 200 }
+        };
+
+        // Thread groups
+        const threadGroups = {
+            'creation': {
+                nodes: ['gen1', 'gen2-creation', 'john1', 'col1', 'rev21', 'rev22'],
+                label: 'Creation',
+                color: '#007bff'
+            },
+            'spirit': {
+                nodes: ['gen2', 'job26', 'ps104', 'ez37', 'jn3', 'acts2'],
+                label: 'Spirit',
+                color: '#28a745'
+            }
+        };
+
+        // Verse to threads
+        const verseThreads = {
+            'gen1': ['creation'],
+            'gen2': ['creation', 'spirit']
+        };
+
+        let activeNodes = new Set();
+        let currentChapter = '';
+
+        // Populate book select
+        books.forEach(book => {
+            const option = document.createElement('option');
+            option.value = book.abbr;
+            option.textContent = book.name;
+            bookSelect.appendChild(option);
+        });
+
+        // Update chapter select
+        bookSelect.addEventListener('change', () => {
+            chapterSelect.innerHTML = '<option value="">Select a Chapter</option>';
+            const book = books.find(b => b.abbr === bookSelect.value);
+            if (book) {
+                for (let i = 1; i <= book.chapters; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = `Chapter ${i}`;
+                    chapterSelect.appendChild(option);
+                }
+            }
+        });
+
+        // Fetch chapter from ESV API
+        async function fetchChapter(book, chapter) {
+            const passage = `${book} ${chapter}`;
+            try {
+                const response = await fetch(`${apiBase}?q=${encodeURIComponent(passage)}&include-verse-numbers=true`, {
+                    headers: { 'Authorization': `Token ${apiKey}` }
+                });
+                const data = await response.json();
+                return data.passages[0] || 'Error loading chapter.';
+            } catch (error) {
+                console.error('API Error:', error);
+                return 'Error loading chapter.';
+            }
+        }
+
+        // Load initial chapter
+        async function loadInitialChapter() {
+            const text = await fetchChapter('Genesis', 1);
+            versesContainer.innerHTML = text;
+            addVerseClickListeners(versesContainer);
+        }
+        loadInitialChapter();
+
+        // Hamburger menu toggle
+        hamburger.addEventListener('click', () => {
+            menu.classList.toggle('active');
+        });
+
+        // Chapter selection
+        chapterSelect.addEventListener('change', async () => {
+            if (bookSelect.value && chapterSelect.value) {
+                const book = books.find(b => b.abbr === bookSelect.value).name;
+                const chapter = chapterSelect.value;
+                currentChapter = `${book} ${chapter}`;
+                const text = await fetchChapter(book, chapter);
+                versesContainer.innerHTML = text;
+                versesContainer.classList.remove('hidden');
+                splitContainer.style.display = 'none';
+                addVerseClickListeners(versesContainer);
+                menu.classList.remove('active');
+            }
+        });
+
+        // Draw thread
+        function drawThread(startNode, endNode, threadElement) {
+            const start = positions[startNode];
+            const end = positions[endNode];
+            const length = end.x - start.x;
+
+            threadElement.style.width = '0px';
+            threadElement.style.height = '1px';
+            threadElement.style.left = `${start.x}px`;
+            threadElement.style.top = `${start.y}px`;
+            threadElement.style.transform = `rotate(0deg)`;
+
+            threadElement.classList.add('active');
+            setTimeout(() => {
+                threadElement.style.width = `${length}px`;
+            }, 100);
+        }
+
+        // Pan to node
+        function panToNode(node) {
+            const nodeRect = node.getBoundingClientRect();
+            const bottomRect = bottomHalf.getBoundingClientRect();
+            const scrollX = nodeRect.left - bottomRect.left + bottomHalf.scrollLeft - (bottomHalf.offsetWidth / 2) + 30;
+            const scrollY = nodeRect.top - bottomRect.top + bottomHalf.scrollTop - (bottomHalf.offsetHeight / 2) + 30;
+
+            bottomHalf.scrollTo({ left: scrollX, top: scrollY, behavior: 'smooth' });
+        }
+
+        // Show chapter with highlighted verse
+        async function showVerseContext(nodeId) {
+            const passage = nodePassages[nodeId];
+            const [book, ref] = passage.split(' ');
+            const chapter = ref.split(':')[0];
+            currentChapter = `${book} ${chapter}`;
+            const verseNum = ref.split(':')[1];
+            const text = await fetchChapter(book, chapter);
+            verseContent.innerHTML = text;
+            const verses = verseContent.querySelectorAll('.v');
+            verses.forEach(v => {
+                if (v.textContent.trim().startsWith(verseNum)) {
+                    v.classList.add('highlight');
+                    v.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+            backButton.style.display = 'block';
+            addVerseClickListeners(verseContent);
+        }
+
+        // Restore previous chapter
+        async function restoreChapter() {
+            if (currentChapter) {
+                const [book, chapter] = currentChapter.split(' ');
+                const text = await fetchChapter(book, chapter);
+                verseContent.innerHTML = text;
+                backButton.style.display = 'none';
+                addVerseClickListeners(verseContent);
+            }
+        }
+
+        // Show threads
+        function showThreads(nodeId) {
+            threadLabels.forEach(label => label.classList.remove('active'));
+            nodes.forEach(node => node.classList.remove('active'));
+            threads.forEach(thread => thread.classList.remove('active'));
+            prompts.forEach(prompt => prompt.classList.remove('active'));
+
+            const verseKey = nodeId.includes('creation') ? 'gen2-creation' : nodeId;
+            const threadTypes = verseThreads[verseKey.split('-')[0]] || [Object.keys(threadGroups).find(type => threadGroups[type].nodes.includes(nodeId))];
+
+            threadTypes.forEach(threadType => {
+                const label = document.getElementById(`label-${threadType}`);
+                if (label) label.classList.add('active');
+
+                const threadNodes = threadGroups[threadType].nodes;
+                threadNodes.forEach(node => {
+                    const el = document.getElementById(node);
+                    if (activeNodes.has(node)) {
+                        el.classList.add('active');
+                        const prompt = document.getElementById(`prompt-${node}`);
+                        if (prompt && node === nodeId) prompt.classList.add('active');
+                    }
+                });
+
+                for (let i = 0; i < threadNodes.length - 1; i++) {
+                    if (activeNodes.has(threadNodes[i]) && activeNodes.has(threadNodes[i + 1])) {
+                        const threadIndex = threadType === 'creation' ? i : i + 5;
+                        threads[threadIndex].classList.add('active');
+                    }
+                }
+            });
+        }
+
+        // Open bottom half
+        function openBottom(nodeId) {
+            versesContainer.classList.add('hidden');
+            splitContainer.style.display = 'flex';
+            bottomHalf.classList.remove('hidden');
+            topHalf.style.flex = '1';
+
+            const node = document.getElementById(nodeId);
+            if (!activeNodes.has(nodeId)) {
+                activeNodes.add(nodeId);
+                node.classList.add('active');
+            }
+
+            showThreads(nodeId);
+            panToNode(node);
+            showVerseContext(nodeId);
+
+            const threadTypes = verseThreads[nodeId.split('-')[0]] || [Object.keys(threadGroups).find(type => threadGroups[type].nodes.includes(nodeId))];
+            threadTypes.forEach(threadType => {
+                const threadNodes = threadGroups[threadType].nodes;
+                const index = threadNodes.indexOf(nodeId);
+                if (index === 0 && !activeNodes.has(threadNodes[1])) {
+                    const threadIndex = threadType === 'creation' ? 0 : 5;
+                    drawThread(nodeId, threadNodes[1], threads[threadIndex]);
+                }
+            });
+        }
+
+        // Close bottom half
+        function closeBottom() {
+            bottomHalf.classList.add('hidden');
+            topHalf.style.flex = '1';
+            prompts.forEach(p => p.classList.remove('active'));
+            threadLabels.forEach(label => label.classList.remove('active'));
+            activeNodes.clear();
+            nodes.forEach(node => node.classList.remove('active'));
+            threads.forEach(thread => thread.classList.remove('active'));
+        }
+
+        // Add verse click listeners
+        function addVerseClickListeners(container) {
+            const verses = container.querySelectorAll('.p');
+            verses.forEach(verse => {
+                verse.addEventListener('click', () => {
+                    const nodeId = Array.from(nodes).find(n => {
+                        const passage = nodePassages[n.id];
+                        return verse.textContent.includes(passage.split(':')[1]);
+                    })?.id;
+                    if (nodeId) openBottom(nodeId);
+                });
+            });
+        }
+
+        // Initial split screen
+        versesContainer.addEventListener('click', () => {
+            openBottom('gen1');
+        });
+
+        // Node interaction
+        nodes.forEach(node => {
+            node.addEventListener('click', () => {
+                const threadType = node.classList.contains('creation') ? 'creation' : 'spirit';
+                const threadNodes = threadGroups[threadType].nodes;
+                const nodeIndex = threadNodes.indexOf(node.id);
+
+                if (!activeNodes.has(node.id)) {
+                    activeNodes.add(node.id);
+                    node.classList.add('active');
+                }
+
+                prompts.forEach(p => p.classList.remove('active'));
+                const prompt = document.getElementById(`prompt-${node.id}`);
+                if (prompt) prompt.classList.add('active');
+
+                panToNode(node);
+                showVerseContext(node.id);
+
+                if (nodeIndex < threadNodes.length - 1 && !activeNodes.has(threadNodes[nodeIndex + 1])) {
+                    const nextNode = threadNodes[nodeIndex + 1];
+                    activeNodes.add(nextNode);
+                    document.getElementById(nextNode).classList.add('active');
+                    const threadOffset = threadType === 'creation' ? 0 : 5;
+                    drawThread(node.id, nextNode, threads[threadOffset + nodeIndex]);
+                }
+
+                showThreads(node.id);
+            });
+        });
+
+        // Back button
+        backButton.addEventListener('click', restoreChapter);
+
+        // Close button
+        closeButton.addEventListener('click', closeBottom);
+    </script>
+</body>
+</html>
