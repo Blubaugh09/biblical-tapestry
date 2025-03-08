@@ -53,36 +53,30 @@
             border: none;
             border-radius: 3px;
         }
+        #verses-container, #split-container {
+            flex: 1;
+            padding: 20px;
+            color: #fff;
+            overflow-y: auto;
+        }
         @media (min-width: 769px) {
             #hamburger {
                 display: none;
             }
             #menu {
                 display: block;
-                position: fixed;
-                left: 0;
             }
             #verses-container, #split-container {
-                margin-left: 250px;
-                width: calc(100% - 250px);
+                margin-left: 250px; /* Shift right of sidebar */
+                width: calc(100% - 250px); /* Fill remaining space */
+                box-sizing: border-box; /* Include padding in width */
             }
-        }
-        #verses-container {
-            flex: 1;
-            padding: 20px;
-            color: #fff;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            cursor: pointer;
         }
         #verses-container.hidden {
             display: none;
         }
         #split-container {
             display: none;
-            flex: 1;
             flex-direction: column;
             height: 100vh;
         }
@@ -244,9 +238,7 @@
             <option value="">Select a Chapter</option>
         </select>
     </div>
-    <div id="verses-container">
-        <div class="verse" data-node="gen1">Loading...</div>
-    </div>
+    <div id="verses-container"></div>
     <div id="split-container">
         <div id="top-half">
             <div id="verse-content"></div>
@@ -400,28 +392,39 @@
             console.log(`Book selected: ${bookSelect.value}`);
         });
 
-        async function fetchChapter(book, chapter) {
-            console.log(`Fetching chapter: ${book} ${chapter}`);
-            const passage = `${book} ${chapter}`;
+        async function fetchVerse(book, chapter, verse) {
+            const passage = `${book} ${chapter}:${verse}`;
+            console.log(`Fetching verse: ${passage}`);
             try {
                 const response = await fetch(`${apiBase}?q=${encodeURIComponent(passage)}&include-verse-numbers=true`, {
                     headers: { 'Authorization': `Token ${apiKey}` }
                 });
                 const data = await response.json();
-                console.log(`Fetched ${passage}:`, data.passages[0].substring(0, 100) + '...');
-                return data.passages[0] || 'Error loading chapter.';
+                const text = data.passages[0] ? data.passages[0].replace(/<[^>]+>/g, '').trim() : 'Error loading verse.';
+                console.log(`Fetched ${passage}: ${text.substring(0, 50)}...`);
+                return text;
             } catch (error) {
                 console.error('API Error:', error);
-                return 'Error loading chapter.';
+                return 'Error loading verse.';
             }
         }
 
-        async function loadInitialChapter() {
-            const text = await fetchChapter('Genesis', 1);
-            versesContainer.innerHTML = text;
-            console.log('Initial HTML:', versesContainer.innerHTML.substring(0, 200));
+        async function loadChapter(book, chapter, verseCount) {
+            versesContainer.innerHTML = '';
+            for (let i = 1; i <= verseCount; i++) {
+                const text = await fetchVerse(book, chapter, i);
+                const verseEl = document.createElement('div');
+                verseEl.className = 'verse';
+                verseEl.dataset.verseNum = i;
+                verseEl.textContent = `${i}. ${text}`;
+                versesContainer.appendChild(verseEl);
+            }
             addVerseClickListeners(versesContainer);
-            console.log('Initial chapter loaded');
+            console.log(`Loaded ${book} ${chapter} with ${verseCount} verses`);
+        }
+
+        async function loadInitialChapter() {
+            await loadChapter('Genesis', 1, 31); // Genesis 1 has 31 verses
         }
         loadInitialChapter();
 
@@ -435,11 +438,10 @@
                 const book = books.find(b => b.abbr === bookSelect.value).name;
                 const chapter = chapterSelect.value;
                 currentChapter = `${book} ${chapter}`;
-                const text = await fetchChapter(book, chapter);
-                versesContainer.innerHTML = text;
+                const verseCount = books.find(b => b.name === book).chapters >= chapter ? 31 : 1; // Simplified; adjust per chapter
+                await loadChapter(book, chapter, verseCount);
                 versesContainer.classList.remove('hidden');
                 splitContainer.style.display = 'none';
-                addVerseClickListeners(versesContainer);
                 if (window.innerWidth <= 768) menu.classList.remove('active');
                 console.log(`Chapter selected: ${currentChapter}`);
             }
@@ -480,19 +482,13 @@
             const node = Object.values(threadsData).flatMap(t => t.nodes).find(n => n.id === nodeId);
             const passage = node.passage;
             const [book, ref] = passage.split(' ');
-            const chapter = ref.split(':')[0];
-            const verseNum = ref.split(':')[1];
+            const [chapter, verseNum] = ref.split(':');
             currentChapter = `${book} ${chapter}`;
-            const text = await fetchChapter(book, chapter);
-            verseContent.innerHTML = text;
-            const verses = verseContent.querySelectorAll('.v');
-            verses.forEach(v => {
-                v.classList.remove('highlight');
-                if (v.textContent.trim().startsWith(verseNum)) {
-                    v.classList.add('highlight');
-                    v.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            });
+            const text = await fetchVerse(book, chapter, verseNum);
+            verseContent.innerHTML = `<div class="verse" data-verse-num="${verseNum}">${verseNum}. ${text}</div>`;
+            const verseEl = verseContent.querySelector('.verse');
+            verseEl.classList.add('highlight');
+            verseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             backButton.style.display = 'block';
             addVerseClickListeners(verseContent);
             console.log(`Showing verse context for ${nodeId}: ${passage}`);
@@ -501,8 +497,9 @@
         async function restoreChapter() {
             if (currentChapter) {
                 const [book, chapter] = currentChapter.split(' ');
-                const text = await fetchChapter(book, chapter);
-                verseContent.innerHTML = text;
+                const verseCount = books.find(b => b.name === book).chapters >= chapter ? 31 : 1;
+                await loadChapter(book, chapter, verseCount);
+                verseContent.innerHTML = versesContainer.innerHTML;
                 backButton.style.display = 'none';
                 addVerseClickListeners(verseContent);
                 console.log(`Restored chapter: ${currentChapter}`);
@@ -596,20 +593,19 @@
         }
 
         function addVerseClickListeners(container) {
-            console.log('Container HTML:', container.innerHTML.substring(0, 200));
-            const verses = container.querySelectorAll('div.p'); // ESV API uses <div class="p">
+            const verses = container.querySelectorAll('.verse');
             console.log(`Adding listeners to ${verses.length} verses`);
             verses.forEach((verse, index) => {
                 verse.addEventListener('click', () => {
-                    console.log(`Verse ${index + 1} clicked: ${verse.textContent.substring(0, 30)}...`);
+                    const verseNum = verse.dataset.verseNum;
+                    console.log(`Verse ${verseNum} clicked: ${verse.textContent.substring(0, 30)}...`);
                     const matchingNodes = Object.values(threadsData).flatMap(t => t.nodes.map(n => ({ ...n, threadType: t }))).filter(n => {
-                        const passage = n.passage;
-                        const verseNum = passage.split(':')[1];
-                        const matches = verse.textContent.includes(verseNum);
-                        console.log(`Checking ${passage} (verse ${verseNum}) against verse text: ${matches}`);
+                        const passageVerse = n.passage.split(':')[1];
+                        const matches = passageVerse === verseNum;
+                        console.log(`Checking ${n.passage} (verse ${passageVerse}) against verse ${verseNum}: ${matches}`);
                         return matches;
                     });
-                    console.log(`Found ${matchingNodes.length} matching nodes for verse`);
+                    console.log(`Found ${matchingNodes.length} matching nodes for verse ${verseNum}`);
                     if (matchingNodes.length > 0) {
                         matchingNodes.forEach(node => {
                             const threadType = node.threadType.label.toLowerCase();
@@ -629,11 +625,7 @@
                             }
                             showThreads(node.id, threadType);
                             const nodeEl = document.getElementById(uniqueNodeId);
-                            if (nodeEl) {
-                                panToNode(nodeEl);
-                            } else {
-                                console.error(`Cannot pan to ${uniqueNodeId} - element missing`);
-                            }
+                            if (nodeEl) panToNode(nodeEl);
                         });
                         showVerseContext(matchingNodes[0].id);
                         versesContainer.classList.add('hidden');
@@ -642,15 +634,17 @@
                         topHalf.style.flex = '1';
                         console.log('Split view opened');
                     } else {
-                        console.log('No matching nodes found for this verse');
+                        console.log(`No matching nodes found for verse ${verseNum}`);
                     }
                 });
             });
         }
 
-        versesContainer.addEventListener('click', () => {
-            console.log('Initial verses container clicked');
-            openBottom('gen1', 'creation');
+        versesContainer.addEventListener('click', (e) => {
+            if (e.target === versesContainer) {
+                console.log('Initial verses container clicked');
+                openBottom('gen1', 'creation');
+            }
         });
 
         document.querySelectorAll('.node').forEach(node => {
