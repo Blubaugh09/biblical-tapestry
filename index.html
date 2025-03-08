@@ -27,22 +27,23 @@
             color: #fff;
             cursor: pointer;
             z-index: 10;
+            display: block;
         }
         #menu {
             position: fixed;
             top: 0;
-            left: -250px;
+            left: 0;
             width: 250px;
             height: 100%;
             background: #333;
             color: #fff;
-            transition: left 0.3s ease;
             z-index: 9;
             padding: 60px 20px 20px;
             overflow-y: auto;
+            display: none; /* Hidden by default */
         }
         #menu.active {
-            left: 0;
+            display: block; /* Shown when active */
         }
         #menu select {
             width: 100%;
@@ -52,6 +53,20 @@
             color: #fff;
             border: none;
             border-radius: 3px;
+        }
+        /* Large devices */
+        @media (min-width: 769px) {
+            #hamburger {
+                display: none; /* Hide hamburger on large screens */
+            }
+            #menu {
+                display: block; /* Always visible on large screens */
+                position: fixed;
+                left: 0;
+            }
+            #verses-container, #split-container {
+                margin-left: 250px; /* Offset content */
+            }
         }
         #verses-container {
             flex: 1;
@@ -226,11 +241,9 @@
     <div id="menu">
         <select id="book-select">
             <option value="">Select a Book</option>
-            <!-- Populated dynamically -->
         </select>
         <select id="chapter-select">
             <option value="">Select a Chapter</option>
-            <!-- Populated dynamically -->
         </select>
     </div>
 
@@ -310,10 +323,10 @@
         const threadLabels = document.querySelectorAll('.thread-label');
 
         // ESV API Key (replace with your own)
-        const apiKey = 'c3be9ae20e39bd6637c709cd2e94fd42135764d1';
+        const apiKey = 'YOUR_ESV_API_KEY_HERE';
         const apiBase = 'https://api.esv.org/v3/passage/html/';
 
-        // Book and chapter data (simplified for demo)
+        // Book and chapter data
         const books = [
             { name: 'Genesis', chapters: 50, abbr: 'Gen' },
             { name: 'John', chapters: 21, abbr: 'John' },
@@ -441,7 +454,7 @@
                 versesContainer.classList.remove('hidden');
                 splitContainer.style.display = 'none';
                 addVerseClickListeners(versesContainer);
-                menu.classList.remove('active');
+                if (window.innerWidth <= 768) menu.classList.remove('active');
             }
         });
 
@@ -478,12 +491,13 @@
             const passage = nodePassages[nodeId];
             const [book, ref] = passage.split(' ');
             const chapter = ref.split(':')[0];
-            currentChapter = `${book} ${chapter}`;
             const verseNum = ref.split(':')[1];
+            currentChapter = `${book} ${chapter}`;
             const text = await fetchChapter(book, chapter);
             verseContent.innerHTML = text;
             const verses = verseContent.querySelectorAll('.v');
             verses.forEach(v => {
+                v.classList.remove('highlight');
                 if (v.textContent.trim().startsWith(verseNum)) {
                     v.classList.add('highlight');
                     v.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -553,16 +567,6 @@
             showThreads(nodeId);
             panToNode(node);
             showVerseContext(nodeId);
-
-            const threadTypes = verseThreads[nodeId.split('-')[0]] || [Object.keys(threadGroups).find(type => threadGroups[type].nodes.includes(nodeId))];
-            threadTypes.forEach(threadType => {
-                const threadNodes = threadGroups[threadType].nodes;
-                const index = threadNodes.indexOf(nodeId);
-                if (index === 0 && !activeNodes.has(threadNodes[1])) {
-                    const threadIndex = threadType === 'creation' ? 0 : 5;
-                    drawThread(nodeId, threadNodes[1], threads[threadIndex]);
-                }
-            });
         }
 
         // Close bottom half
