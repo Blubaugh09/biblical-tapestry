@@ -580,12 +580,12 @@
 
             const threadNodes = threadsData[threadType].nodes;
             const index = threadNodes.findIndex(n => n.id === nodeId);
-            if (index === 0 && threadNodes.length > 1 && !activeNodes.has(`${threadNodes[1].id}-${threadType}`)) {
-                const nextNodeId = `${threadNodes[1].id}-${threadType}`;
+            if (index < threadNodes.length - 1 && !activeNodes.has(`${threadNodes[index + 1].id}-${threadType}`)) {
+                const nextNodeId = `${threadNodes[index + 1].id}-${threadType}`;
                 activeNodes.add(nextNodeId);
                 document.getElementById(nextNodeId).classList.add('active');
-                const threadEl = document.getElementById(`thread-${threadType}-0`);
-                drawThread(threadEl);
+                const threadEl = document.getElementById(`thread-${threadType}-${index}`);
+                if (threadEl) drawThread(threadEl);
             }
         }
 
@@ -610,8 +610,24 @@
                         return verse.textContent.includes(passage.split(':')[1]);
                     });
                     if (matchingNodes.length > 0) {
-                        // Use the first thread as default for initial click
-                        openBottom(matchingNodes[0].id, matchingNodes[0].threadType.label.toLowerCase());
+                        // Activate all threads for this verse
+                        matchingNodes.forEach(node => {
+                            const threadType = node.threadType.label.toLowerCase();
+                            const uniqueNodeId = `${node.id}-${threadType}`;
+                            if (!activeNodes.has(uniqueNodeId)) {
+                                activeNodes.add(uniqueNodeId);
+                                const nodeEl = document.getElementById(uniqueNodeId);
+                                nodeEl.classList.add('active');
+                            }
+                            showThreads(node.id, threadType);
+                            panToNode(document.getElementById(uniqueNodeId));
+                        });
+                        // Show verse context for the first node (arbitrary choice)
+                        showVerseContext(matchingNodes[0].id);
+                        versesContainer.classList.add('hidden');
+                        splitContainer.style.display = 'flex';
+                        bottomHalf.classList.remove('hidden');
+                        topHalf.style.flex = '1';
                     }
                 });
             });
@@ -648,7 +664,7 @@
                     activeNodes.add(nextNodeId);
                     document.getElementById(nextNodeId).classList.add('active');
                     const threadEl = document.getElementById(`thread-${threadType}-${nodeIndex}`);
-                    drawThread(threadEl);
+                    if (threadEl) drawThread(threadEl);
                 }
 
                 showThreads(nodeId, threadType);
