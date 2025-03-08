@@ -328,22 +328,25 @@
             'gen2': ['creation', 'spirit']
         };
 
-        // Dynamic node positions
+        // Dynamic node positions (thread-specific)
         const nodePositions = {};
         let yOffset = 70; // Starting Y position
         const xSpacing = 200; // Horizontal spacing between nodes
         const nodeWidth = 60; // Node width for edge alignment
-        Object.keys(threadsData).forEach((threadType, index) => {
+        Object.keys(threadsData).forEach((threadType) => {
             const thread = threadsData[threadType];
             const labelY = yOffset - 30;
             thread.labelY = labelY;
+            thread.nodePositions = {}; // Store positions per thread
             thread.nodes.forEach((node, nodeIndex) => {
-                nodePositions[node.id] = {
+                const pos = {
                     x: 100 + nodeIndex * xSpacing,
                     y: yOffset
                 };
+                thread.nodePositions[node.id] = pos;
+                nodePositions[`${node.id}-${threadType}`] = pos; // Unique key for global lookup
             });
-            yOffset += 100;
+            yOffset += 100; // Increment Y for next thread
         });
 
         // Populate tapestry container
@@ -363,8 +366,8 @@
                 const nodeEl = document.createElement('div');
                 nodeEl.className = `node ${threadType}`;
                 nodeEl.id = `${node.id}-${threadType}`; // Unique ID per thread
-                nodeEl.style.top = `${nodePositions[node.id].y}px`;
-                nodeEl.style.left = `${nodePositions[node.id].x}px`;
+                nodeEl.style.top = `${thread.nodePositions[node.id].y}px`;
+                nodeEl.style.left = `${thread.nodePositions[node.id].x}px`;
                 nodeEl.innerHTML = `<span>${node.label}</span>`;
                 nodeEl.dataset.nodeId = node.id; // Store original node ID
                 tapestryContainer.appendChild(nodeEl);
@@ -374,8 +377,8 @@
                 prompt.className = `prompt ${threadType}`;
                 prompt.id = `prompt-${node.id}-${threadType}`;
                 prompt.textContent = node.question;
-                prompt.style.top = `${nodePositions[node.id].y + 70}px`;
-                prompt.style.left = `${nodePositions[node.id].x}px`;
+                prompt.style.top = `${thread.nodePositions[node.id].y + 70}px`;
+                prompt.style.left = `${thread.nodePositions[node.id].x}px`;
                 tapestryContainer.appendChild(prompt);
 
                 // Thread (edge) if not last node
@@ -460,10 +463,11 @@
 
         // Draw thread
         function drawThread(threadElement) {
+            const threadType = threadElement.classList.contains('creation') ? 'creation' : 'spirit';
             const startNode = threadElement.dataset.startNode;
             const endNode = threadElement.dataset.endNode;
-            const start = nodePositions[startNode];
-            const end = nodePositions[endNode];
+            const start = threadsData[threadType].nodePositions[startNode];
+            const end = threadsData[threadType].nodePositions[endNode];
             const length = end.x - start.x;
 
             threadElement.style.width = '0px';
@@ -610,19 +614,23 @@
                         return verse.textContent.includes(passage.split(':')[1]);
                     });
                     if (matchingNodes.length > 0) {
-                        // Activate all threads for this verse
                         matchingNodes.forEach(node => {
                             const threadType = node.threadType.label.toLowerCase();
                             const uniqueNodeId = `${node.id}-${threadType}`;
                             if (!activeNodes.has(uniqueNodeId)) {
                                 activeNodes.add(uniqueNodeId);
                                 const nodeEl = document.getElementById(uniqueNodeId);
-                                nodeEl.classList.add('active');
+                                if (nodeEl) {
+                                    nodeEl.classList.add('active');
+                                    console.log(`Activating ${uniqueNodeId} at x:${nodeEl.style.left}, y:${nodeEl.style.top}`);
+                                } else {
+                                    console.error(`Node ${uniqueNodeId} not found`);
+                                }
                             }
                             showThreads(node.id, threadType);
-                            panToNode(document.getElementById(uniqueNodeId));
+                            const nodeEl = document.getElementById(uniqueNodeId);
+                            if (nodeEl) panToNode(nodeEl);
                         });
-                        // Show verse context for the first node (arbitrary choice)
                         showVerseContext(matchingNodes[0].id);
                         versesContainer.classList.add('hidden');
                         splitContainer.style.display = 'flex';
