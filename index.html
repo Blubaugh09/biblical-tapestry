@@ -392,6 +392,23 @@
             console.log(`Book selected: ${bookSelect.value}`);
         });
 
+        async function fetchVerse(book, chapter, verse) {
+            const passage = `${book} ${chapter}:${verse}`;
+            console.log(`Fetching verse: ${passage}`);
+            try {
+                const response = await fetch(`${apiBase}?q=${encodeURIComponent(passage)}&include-verse-numbers=true`, {
+                    headers: { 'Authorization': `Token ${apiKey}` }
+                });
+                const data = await response.json();
+                const text = data.passages[0] ? data.passages[0].replace(/<[^>]+>/g, '').trim() : 'Error loading verse.';
+                console.log(`Fetched ${passage}: ${text.substring(0, 50)}...`);
+                return text;
+            } catch (error) {
+                console.error('API Error:', error);
+                return 'Error loading verse.';
+            }
+        }
+
         async function fetchChapter(book, chapter) {
             const passage = `${book} ${chapter}`;
             console.log(`Fetching chapter: ${passage}`);
@@ -400,7 +417,7 @@
                     headers: { 'Authorization': `Token ${apiKey}` }
                 });
                 const data = await response.json();
-                const text = data.passages[0] ? data.passages[0].replace(/<h2>.*<\/h2>/g, '').replace(/<div class="esv-text">|<\/div>/g, '') : 'Error loading chapter.';
+                const text = data.passages[0] ? data.passages[0].replace(/<h2>.*<\/h2>/g, '') : 'Error loading chapter.';
                 console.log(`Fetched ${passage}: ${text.substring(0, 50)}...`);
                 return text;
             } catch (error) {
@@ -409,20 +426,22 @@
             }
         }
 
-        async function loadChapter(book, chapter) {
-            const text = await fetchChapter(book, chapter);
-            versesContainer.innerHTML = text;
-            const verses = versesContainer.querySelectorAll('.p');
-            verses.forEach((verse, i) => {
-                verse.className = 'verse';
-                verse.dataset.verseNum = i + 1;
-            });
+        async function loadChapterVerseByVerse(book, chapter, verseCount) {
+            versesContainer.innerHTML = '';
+            for (let i = 1; i <= verseCount; i++) {
+                const text = await fetchVerse(book, chapter, i);
+                const verseEl = document.createElement('div');
+                verseEl.className = 'verse';
+                verseEl.dataset.verseNum = i;
+                verseEl.textContent = `${i}. ${text}`;
+                versesContainer.appendChild(verseEl);
+            }
             addVerseClickListeners(versesContainer);
-            console.log(`Loaded ${book} ${chapter} with ${verses.length} verses`);
+            console.log(`Loaded ${book} ${chapter} with ${verseCount} verses`);
         }
 
         async function loadInitialChapter() {
-            await loadChapter('Genesis', 1);
+            await loadChapterVerseByVerse('Genesis', 1, 31); // Genesis 1 has 31 verses
         }
         loadInitialChapter();
 
@@ -436,7 +455,7 @@
                 const book = books.find(b => b.abbr === bookSelect.value).name;
                 const chapter = chapterSelect.value;
                 currentChapter = `${book} ${chapter}`;
-                await loadChapter(book, chapter);
+                await loadChapterVerseByVerse(book, chapter, 31); // Adjust verseCount dynamically later
                 versesContainer.classList.remove('hidden');
                 splitContainer.style.display = 'none';
                 if (window.innerWidth <= 768) menu.classList.remove('active');
@@ -457,19 +476,18 @@
             threadElement.style.left = `${start.x + nodeWidth / 2}px`;
             threadElement.style.top = `${start.y + nodeWidth / 2}px`;
             threadElement.style.transform = `rotate(0deg)`;
-
             threadElement.classList.add('active');
             setTimeout(() => {
                 threadElement.style.width = `${length}px`;
-            }, 100);
+            }, 10);
             console.log(`Drawing thread ${threadElement.id} from ${start.x},${start.y} to ${end.x},${end.y}`);
         }
 
         function panToNode(node) {
             const nodeRect = node.getBoundingClientRect();
             const bottomRect = bottomHalf.getBoundingClientRect();
-            const scrollX = nodeRect.left - bottomRect.left + bottomHalf.scrollLeft - 30; // Align left edge
-            const scrollY = nodeRect.top - bottomRect.top + bottomHalf.scrollTop - 30; // Align top edge
+            const scrollX = nodeRect.left - bottomRect.left + bottomHalf.scrollLeft - 30;
+            const scrollY = nodeRect.top - bottomRect.top + bottomHalf.scrollTop - 30;
 
             bottomHalf.scrollTo({ left: scrollX, top: scrollY, behavior: 'smooth' });
             console.log(`Panning to node ${node.id} at x:${scrollX}, y:${scrollY}`);
@@ -495,13 +513,13 @@
             });
             backButton.style.display = 'block';
             addVerseClickListeners(verseContent);
-            console.log(`Showing verse context for ${nodeId}: ${passage}`);
+            console.log(`Showing full chapter for ${nodeId}: ${passage}`);
         }
 
         async function restoreChapter() {
             if (currentChapter) {
                 const [book, chapter] = currentChapter.split(' ');
-                await loadChapter(book, chapter);
+                await loadChapterVerseByVerse(book, chapter, 31); // Adjust verseCount later
                 verseContent.innerHTML = versesContainer.innerHTML;
                 backButton.style.display = 'none';
                 addVerseClickListeners(verseContent);
@@ -510,39 +528,33 @@
         }
 
         function showThreads(nodeId, threadTypeClicked) {
-            const threadLabels = document.querySelectorAll('.thread-label');
-            const nodes = document.querySelectorAll('.node');
-            const threads = document.querySelectorAll('.thread');
-            const prompts = document.querySelectorAll('.prompt');
+            document.querySelectorAll('.thread-label').forEach(label => label.classList.remove('active'));
+            document.querySelectorAll('.node').forEach(node => node.classList.remove('active'));
+            document.querySelectorAll('.thread').forEach(thread => thread.classList.remove('active'));
+            document.querySelectorAll('.prompt').forEach(prompt => prompt.classList.remove('active'));
 
-            threadLabels.forEach(label => label.classList.remove('active'));
-            nodes.forEach(node => node.classList.remove('active'));
-            threads.forEach(thread => thread.classList.remove('active'));
-            prompts.forEach(prompt => prompt.classList.remove('active'));
-
-            const verseKey = nodeId.includes('creation') ? 'gen2-creation' : nodeId;
+            const verseKey = nodeId === 'gen2-creation' ? 'gen2' : nodeId;
             const threadTypes = verseThreads[verseKey] || [threadTypeClicked];
 
             threadTypes.forEach(threadType => {
-                const label = document.getElementById(`label-${threadType}`);
-                if (label) label.classList.add('active');
-
+                document.getElementById(`label-${threadType}`).classList.add('active');
                 const threadNodes = threadsData[threadType].nodes;
                 threadNodes.forEach(node => {
                     const el = document.getElementById(`${node.id}-${threadType}`);
                     if (activeNodes.has(`${node.id}-${threadType}`)) {
                         el.classList.add('active');
-                        const prompt = document.getElementById(`prompt-${node.id}-${threadType}`);
-                        if (prompt && node.id === nodeId && threadType === threadTypeClicked) prompt.classList.add('active');
+                        if (node.id === nodeId && threadType === threadTypeClicked) {
+                            document.getElementById(`prompt-${node.id}-${threadType}`).classList.add('active');
+                        }
                     }
                 });
 
                 const activeNodeIds = Array.from(activeNodes).filter(id => id.endsWith(`-${threadType}`)).map(id => id.split('-')[0]);
-                threads.forEach(thread => {
+                document.querySelectorAll(`.thread.${threadType}`).forEach(thread => {
                     const startNode = thread.dataset.startNode;
                     const endNode = thread.dataset.endNode;
-                    if (activeNodeIds.includes(startNode) && activeNodeIds.includes(endNode) && thread.classList.contains(threadType)) {
-                        drawThread(thread); // Redraw all eligible threads
+                    if (activeNodeIds.includes(startNode) && activeNodeIds.includes(endNode)) {
+                        drawThread(thread);
                     }
                 });
             });
@@ -565,16 +577,6 @@
             showThreads(nodeId, threadType);
             panToNode(node);
             showVerseContext(nodeId);
-
-            const threadNodes = threadsData[threadType].nodes;
-            const index = threadNodes.findIndex(n => n.id === nodeId);
-            if (index < threadNodes.length - 1 && !activeNodes.has(`${threadNodes[index + 1].id}-${threadType}`)) {
-                const nextNodeId = `${threadNodes[index + 1].id}-${threadType}`;
-                activeNodes.add(nextNodeId);
-                document.getElementById(nextNodeId).classList.add('active');
-                const threadEl = document.getElementById(`thread-${threadType}-${index}`);
-                if (threadEl) drawThread(threadEl);
-            }
             console.log(`Opened bottom for ${uniqueNodeId}`);
         }
 
@@ -592,14 +594,12 @@
         function addVerseClickListeners(container) {
             const verses = container.querySelectorAll('.verse');
             console.log(`Adding listeners to ${verses.length} verses`);
-            verses.forEach((verse) => {
+            verses.forEach(verse => {
                 verse.addEventListener('click', () => {
                     const verseNum = verse.dataset.verseNum;
                     console.log(`Verse ${verseNum} clicked: ${verse.textContent.substring(0, 30)}...`);
-                    const matchingNodes = Object.values(threadsData).flatMap(t => t.nodes.map(n => ({ ...n, threadType: t }))).filter(n => {
-                        const passageVerse = n.passage.split(':')[1];
-                        return passageVerse === verseNum;
-                    });
+                    const matchingNodes = Object.values(threadsData).flatMap(t => t.nodes.map(n => ({ ...n, threadType: t })))
+                        .filter(n => n.passage.split(':')[1] === verseNum);
                     console.log(`Found ${matchingNodes.length} matching nodes for verse ${verseNum}`);
                     if (matchingNodes.length > 0) {
                         const firstNode = matchingNodes[0];
@@ -618,8 +618,6 @@
                         bottomHalf.classList.remove('hidden');
                         topHalf.style.flex = '1';
                         console.log('Split view opened');
-                    } else {
-                        console.log(`No matching nodes found for verse ${verseNum}`);
                     }
                 });
             });
