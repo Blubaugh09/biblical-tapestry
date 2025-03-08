@@ -63,8 +63,8 @@
                 left: 0;
             }
             #verses-container, #split-container {
-                margin-left: 250px; /* Ensure content moves right */
-                width: calc(100% - 250px); /* Adjust width to fit */
+                margin-left: 250px;
+                width: calc(100% - 250px);
             }
         }
         #verses-container {
@@ -235,7 +235,6 @@
     </style>
 </head>
 <body>
-    <!-- Hamburger Menu -->
     <button id="hamburger">☰</button>
     <div id="menu">
         <select id="book-select">
@@ -245,13 +244,9 @@
             <option value="">Select a Chapter</option>
         </select>
     </div>
-
-    <!-- Initial Verses Display -->
     <div id="verses-container">
         <div class="verse" data-node="gen1">Loading...</div>
     </div>
-
-    <!-- Split Screen -->
     <div id="split-container">
         <div id="top-half">
             <div id="verse-content"></div>
@@ -277,11 +272,9 @@
         const chapterSelect = document.getElementById('chapter-select');
         const tapestryContainer = document.getElementById('tapestry-container');
 
-        // ESV API Key (replace with your own)
         const apiKey = 'c3be9ae20e39bd6637c709cd2e94fd42135764d1';
         const apiBase = 'https://api.esv.org/v3/passage/html/';
 
-        // Book and chapter data
         const books = [
             { name: 'Genesis', chapters: 50, abbr: 'Gen' },
             { name: 'John', chapters: 21, abbr: 'John' },
@@ -293,7 +286,6 @@
             { name: 'Acts', chapters: 28, abbr: 'Acts' }
         ];
 
-        // Threads JSON
         const threadsData = {
             "creation": {
                 "initialVerse": "gen1",
@@ -323,34 +315,28 @@
             }
         };
 
-        // Verse to threads mapping
         const verseThreads = {
             'gen1': ['creation'],
             'gen2': ['creation', 'spirit']
         };
 
-        // Dynamic node positions (thread-specific)
         const nodePositions = {};
-        let yOffset = 70; // Starting Y position
-        const xSpacing = 200; // Horizontal spacing between nodes
-        const nodeWidth = 60; // Node width for edge alignment
+        let yOffset = 70;
+        const xSpacing = 200;
+        const nodeWidth = 60;
         Object.keys(threadsData).forEach((threadType) => {
             const thread = threadsData[threadType];
             const labelY = yOffset - 30;
             thread.labelY = labelY;
             thread.nodePositions = {};
             thread.nodes.forEach((node, nodeIndex) => {
-                const pos = {
-                    x: 100 + nodeIndex * xSpacing,
-                    y: yOffset
-                };
+                const pos = { x: 100 + nodeIndex * xSpacing, y: yOffset };
                 thread.nodePositions[node.id] = pos;
                 nodePositions[`${node.id}-${threadType}`] = pos;
             });
             yOffset += 100;
         });
 
-        // Populate tapestry container
         Object.keys(threadsData).forEach(threadType => {
             const thread = threadsData[threadType];
             const label = document.createElement('div');
@@ -393,7 +379,6 @@
         let activeNodes = new Set();
         let currentChapter = '';
 
-        // Populate book select
         books.forEach(book => {
             const option = document.createElement('option');
             option.value = book.abbr;
@@ -401,7 +386,6 @@
             bookSelect.appendChild(option);
         });
 
-        // Update chapter select
         bookSelect.addEventListener('change', () => {
             chapterSelect.innerHTML = '<option value="">Select a Chapter</option>';
             const book = books.find(b => b.abbr === bookSelect.value);
@@ -413,9 +397,9 @@
                     chapterSelect.appendChild(option);
                 }
             }
+            console.log(`Book selected: ${bookSelect.value}`);
         });
 
-        // Fetch chapter from ESV API
         async function fetchChapter(book, chapter) {
             console.log(`Fetching chapter: ${book} ${chapter}`);
             const passage = `${book} ${chapter}`;
@@ -424,7 +408,7 @@
                     headers: { 'Authorization': `Token ${apiKey}` }
                 });
                 const data = await response.json();
-                console.log(`Fetched ${passage}:`, data.passages[0] ? 'Success' : 'Empty');
+                console.log(`Fetched ${passage}:`, data.passages[0].substring(0, 100) + '...');
                 return data.passages[0] || 'Error loading chapter.';
             } catch (error) {
                 console.error('API Error:', error);
@@ -432,22 +416,20 @@
             }
         }
 
-        // Load initial chapter
         async function loadInitialChapter() {
             const text = await fetchChapter('Genesis', 1);
             versesContainer.innerHTML = text;
+            console.log('Initial HTML:', versesContainer.innerHTML.substring(0, 200));
             addVerseClickListeners(versesContainer);
             console.log('Initial chapter loaded');
         }
         loadInitialChapter();
 
-        // Hamburger menu toggle
         hamburger.addEventListener('click', () => {
             menu.classList.toggle('active');
             console.log('Hamburger clicked, menu active:', menu.classList.contains('active'));
         });
 
-        // Chapter selection
         chapterSelect.addEventListener('change', async () => {
             if (bookSelect.value && chapterSelect.value) {
                 const book = books.find(b => b.abbr === bookSelect.value).name;
@@ -463,7 +445,6 @@
             }
         });
 
-        // Draw thread
         function drawThread(threadElement) {
             const threadType = threadElement.classList.contains('creation') ? 'creation' : 'spirit';
             const startNode = threadElement.dataset.startNode;
@@ -485,7 +466,6 @@
             console.log(`Drawing thread ${threadElement.id} from ${start.x},${start.y} to ${end.x},${end.y}`);
         }
 
-        // Pan to node
         function panToNode(node) {
             const nodeRect = node.getBoundingClientRect();
             const bottomRect = bottomHalf.getBoundingClientRect();
@@ -496,7 +476,6 @@
             console.log(`Panning to node ${node.id} at x:${scrollX}, y:${scrollY}`);
         }
 
-        // Show chapter with highlighted verse
         async function showVerseContext(nodeId) {
             const node = Object.values(threadsData).flatMap(t => t.nodes).find(n => n.id === nodeId);
             const passage = node.passage;
@@ -519,7 +498,6 @@
             console.log(`Showing verse context for ${nodeId}: ${passage}`);
         }
 
-        // Restore previous chapter
         async function restoreChapter() {
             if (currentChapter) {
                 const [book, chapter] = currentChapter.split(' ');
@@ -531,7 +509,6 @@
             }
         }
 
-        // Show threads
         function showThreads(nodeId, threadTypeClicked) {
             const threadLabels = document.querySelectorAll('.thread-label');
             const nodes = document.querySelectorAll('.node');
@@ -578,7 +555,6 @@
             });
         }
 
-        // Open bottom half
         function openBottom(nodeId, threadType) {
             versesContainer.classList.add('hidden');
             splitContainer.style.display = 'flex';
@@ -608,7 +584,6 @@
             }
         }
 
-        // Close bottom half
         function closeBottom() {
             bottomHalf.classList.add('hidden');
             topHalf.style.flex = '1';
@@ -620,9 +595,9 @@
             console.log('Bottom closed, active nodes cleared');
         }
 
-        // Add verse click listeners
         function addVerseClickListeners(container) {
-            const verses = container.querySelectorAll('.p');
+            console.log('Container HTML:', container.innerHTML.substring(0, 200));
+            const verses = container.querySelectorAll('div.p'); // ESV API uses <div class="p">
             console.log(`Adding listeners to ${verses.length} verses`);
             verses.forEach((verse, index) => {
                 verse.addEventListener('click', () => {
@@ -673,13 +648,11 @@
             });
         }
 
-        // Initial split screen
         versesContainer.addEventListener('click', () => {
             console.log('Initial verses container clicked');
             openBottom('gen1', 'creation');
         });
 
-        // Node interaction
         document.querySelectorAll('.node').forEach(node => {
             node.addEventListener('click', () => {
                 const nodeId = node.dataset.nodeId;
@@ -718,10 +691,7 @@
             });
         });
 
-        // Back button
         backButton.addEventListener('click', restoreChapter);
-
-        // Close button
         closeButton.addEventListener('click', closeBottom);
     </script>
 </body>
