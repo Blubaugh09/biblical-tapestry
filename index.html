@@ -332,9 +332,10 @@
         const nodePositions = {};
         let yOffset = 70; // Starting Y position
         const xSpacing = 200; // Horizontal spacing between nodes
+        const nodeWidth = 60; // Node width for edge alignment
         Object.keys(threadsData).forEach((threadType, index) => {
             const thread = threadsData[threadType];
-            const labelY = yOffset - 30; // Label 30px above nodes
+            const labelY = yOffset - 30;
             thread.labelY = labelY;
             thread.nodes.forEach((node, nodeIndex) => {
                 nodePositions[node.id] = {
@@ -342,7 +343,7 @@
                     y: yOffset
                 };
             });
-            yOffset += 100; // Space between threads
+            yOffset += 100;
         });
 
         // Populate tapestry container
@@ -357,20 +358,21 @@
             label.style.left = '100px';
             tapestryContainer.appendChild(label);
 
-            // Nodes
+            // Nodes and Threads
             thread.nodes.forEach((node, index) => {
                 const nodeEl = document.createElement('div');
                 nodeEl.className = `node ${threadType}`;
-                nodeEl.id = node.id;
+                nodeEl.id = `${node.id}-${threadType}`; // Unique ID per thread
                 nodeEl.style.top = `${nodePositions[node.id].y}px`;
                 nodeEl.style.left = `${nodePositions[node.id].x}px`;
                 nodeEl.innerHTML = `<span>${node.label}</span>`;
+                nodeEl.dataset.nodeId = node.id; // Store original node ID
                 tapestryContainer.appendChild(nodeEl);
 
                 // Prompt
                 const prompt = document.createElement('div');
                 prompt.className = `prompt ${threadType}`;
-                prompt.id = `prompt-${node.id}`;
+                prompt.id = `prompt-${node.id}-${threadType}`;
                 prompt.textContent = node.question;
                 prompt.style.top = `${nodePositions[node.id].y + 70}px`;
                 prompt.style.left = `${nodePositions[node.id].x}px`;
@@ -381,6 +383,8 @@
                     const threadEl = document.createElement('div');
                     threadEl.className = `thread ${threadType}`;
                     threadEl.id = `thread-${threadType}-${index}`;
+                    threadEl.dataset.startNode = node.id;
+                    threadEl.dataset.endNode = thread.nodes[index + 1].id;
                     tapestryContainer.appendChild(threadEl);
                 }
             });
@@ -455,15 +459,17 @@
         });
 
         // Draw thread
-        function drawThread(startNode, endNode, threadElement) {
+        function drawThread(threadElement) {
+            const startNode = threadElement.dataset.startNode;
+            const endNode = threadElement.dataset.endNode;
             const start = nodePositions[startNode];
             const end = nodePositions[endNode];
             const length = end.x - start.x;
 
             threadElement.style.width = '0px';
             threadElement.style.height = '1px';
-            threadElement.style.left = `${start.x}px`;
-            threadElement.style.top = `${start.y}px`;
+            threadElement.style.left = `${start.x + nodeWidth / 2}px`; // Center of start node
+            threadElement.style.top = `${start.y + nodeWidth / 2}px`; // Center of start node
             threadElement.style.transform = `rotate(0deg)`;
 
             threadElement.classList.add('active');
@@ -516,7 +522,7 @@
         }
 
         // Show threads
-        function showThreads(nodeId) {
+        function showThreads(nodeId, threadTypeClicked) {
             const threadLabels = document.querySelectorAll('.thread-label');
             const nodes = document.querySelectorAll('.node');
             const threads = document.querySelectorAll('.thread');
@@ -528,7 +534,7 @@
             prompts.forEach(prompt => prompt.classList.remove('active'));
 
             const verseKey = nodeId.includes('creation') ? 'gen2-creation' : nodeId;
-            const threadTypes = verseThreads[verseKey.split('-')[0]] || [Object.keys(threadsData).find(type => threadsData[type].nodes.some(n => n.id === nodeId))];
+            const threadTypes = verseThreads[verseKey] || [threadTypeClicked];
 
             threadTypes.forEach(threadType => {
                 const label = document.getElementById(`label-${threadType}`);
@@ -536,39 +542,51 @@
 
                 const threadNodes = threadsData[threadType].nodes;
                 threadNodes.forEach(node => {
-                    const el = document.getElementById(node.id);
-                    if (activeNodes.has(node.id)) {
+                    const el = document.getElementById(`${node.id}-${threadType}`);
+                    if (activeNodes.has(`${node.id}-${threadType}`)) {
                         el.classList.add('active');
-                        const prompt = document.getElementById(`prompt-${node.id}`);
-                        if (prompt && node.id === nodeId) prompt.classList.add('active');
+                        const prompt = document.getElementById(`prompt-${node.id}-${threadType}`);
+                        if (prompt && node.id === nodeId && threadType === threadTypeClicked) prompt.classList.add('active');
                     }
                 });
 
-                for (let i = 0; i < threadNodes.length - 1; i++) {
-                    if (activeNodes.has(threadNodes[i].id) && activeNodes.has(threadNodes[i + 1].id)) {
-                        const threadIndex = threadType === 'creation' ? i : i + 5;
-                        threads[threadIndex].classList.add('active');
+                threads.forEach(thread => {
+                    const startNode = thread.dataset.startNode;
+                    const endNode = thread.dataset.endNode;
+                    if (activeNodes.has(`${startNode}-${threadType}`) && activeNodes.has(`${endNode}-${threadType}`)) {
+                        thread.classList.add('active');
                     }
-                }
+                });
             });
         }
 
         // Open bottom half
-        function openBottom(nodeId) {
+        function openBottom(nodeId, threadType) {
             versesContainer.classList.add('hidden');
             splitContainer.style.display = 'flex';
             bottomHalf.classList.remove('hidden');
             topHalf.style.flex = '1';
 
-            const node = document.getElementById(nodeId);
-            if (!activeNodes.has(nodeId)) {
-                activeNodes.add(nodeId);
+            const uniqueNodeId = `${nodeId}-${threadType}`;
+            const node = document.getElementById(uniqueNodeId);
+            if (!activeNodes.has(uniqueNodeId)) {
+                activeNodes.add(uniqueNodeId);
                 node.classList.add('active');
             }
 
-            showThreads(nodeId);
+            showThreads(nodeId, threadType);
             panToNode(node);
             showVerseContext(nodeId);
+
+            const threadNodes = threadsData[threadType].nodes;
+            const index = threadNodes.findIndex(n => n.id === nodeId);
+            if (index === 0 && threadNodes.length > 1 && !activeNodes.has(`${threadNodes[1].id}-${threadType}`)) {
+                const nextNodeId = `${threadNodes[1].id}-${threadType}`;
+                activeNodes.add(nextNodeId);
+                document.getElementById(nextNodeId).classList.add('active');
+                const threadEl = document.getElementById(`thread-${threadType}-0`);
+                drawThread(threadEl);
+            }
         }
 
         // Close bottom half
@@ -587,48 +605,53 @@
             const verses = container.querySelectorAll('.p');
             verses.forEach(verse => {
                 verse.addEventListener('click', () => {
-                    const node = Object.values(threadsData).flatMap(t => t.nodes).find(n => {
+                    const matchingNodes = Object.values(threadsData).flatMap(t => t.nodes.map(n => ({ ...n, threadType: t }))).filter(n => {
                         const passage = n.passage;
                         return verse.textContent.includes(passage.split(':')[1]);
                     });
-                    if (node) openBottom(node.id);
+                    if (matchingNodes.length > 0) {
+                        // Use the first thread as default for initial click
+                        openBottom(matchingNodes[0].id, matchingNodes[0].threadType.label.toLowerCase());
+                    }
                 });
             });
         }
 
         // Initial split screen
         versesContainer.addEventListener('click', () => {
-            openBottom('gen1');
+            openBottom('gen1', 'creation');
         });
 
         // Node interaction
         document.querySelectorAll('.node').forEach(node => {
             node.addEventListener('click', () => {
-                const threadType = Object.keys(threadsData).find(type => threadsData[type].nodes.some(n => n.id === node.id));
+                const nodeId = node.dataset.nodeId;
+                const threadType = node.classList.contains('creation') ? 'creation' : 'spirit';
+                const uniqueNodeId = `${nodeId}-${threadType}`;
                 const threadNodes = threadsData[threadType].nodes;
-                const nodeIndex = threadNodes.findIndex(n => n.id === node.id);
+                const nodeIndex = threadNodes.findIndex(n => n.id === nodeId);
 
-                if (!activeNodes.has(node.id)) {
-                    activeNodes.add(node.id);
+                if (!activeNodes.has(uniqueNodeId)) {
+                    activeNodes.add(uniqueNodeId);
                     node.classList.add('active');
                 }
 
                 document.querySelectorAll('.prompt').forEach(p => p.classList.remove('active'));
-                const prompt = document.getElementById(`prompt-${node.id}`);
+                const prompt = document.getElementById(`prompt-${nodeId}-${threadType}`);
                 if (prompt) prompt.classList.add('active');
 
                 panToNode(node);
-                showVerseContext(node.id);
+                showVerseContext(nodeId);
 
-                if (nodeIndex < threadNodes.length - 1 && !activeNodes.has(threadNodes[nodeIndex + 1].id)) {
-                    const nextNode = threadNodes[nodeIndex + 1].id;
-                    activeNodes.add(nextNode);
-                    document.getElementById(nextNode).classList.add('active');
-                    const threadOffset = threadType === 'creation' ? 0 : 5;
-                    drawThread(node.id, nextNode, document.getElementById(`thread-${threadType}-${nodeIndex}`));
+                if (nodeIndex < threadNodes.length - 1 && !activeNodes.has(`${threadNodes[nodeIndex + 1].id}-${threadType}`)) {
+                    const nextNodeId = `${threadNodes[nodeIndex + 1].id}-${threadType}`;
+                    activeNodes.add(nextNodeId);
+                    document.getElementById(nextNodeId).classList.add('active');
+                    const threadEl = document.getElementById(`thread-${threadType}-${nodeIndex}`);
+                    drawThread(threadEl);
                 }
 
-                showThreads(node.id);
+                showThreads(nodeId, threadType);
             });
         });
 
